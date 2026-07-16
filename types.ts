@@ -48,3 +48,17 @@ export interface ModelOption {
   name: string;
   displayName?: string;
 }
+
+export type RunMode = 'demo' | 'live';
+
+export type TutorialStatus = 'not_started' | 'in_progress' | 'completed';
+
+export type TutorialStep = 'welcome' | 'ingredients' | 'preferences' | 'results';
+
+export interface DemoScenario {
+  id: string;
+  title: string;
+  description: string;
+  ingredients: Ingredient[];
+  recipes: Recipe[];
+}
