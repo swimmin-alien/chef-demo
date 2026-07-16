@@ -4,9 +4,13 @@ import Inventory from './components/Inventory';
 import RecipeList from './components/RecipeList';
 import Settings from './components/Settings';
 import Favorites from './components/Favorites';
-import { Ingredient, Recipe, Category, AppSettings, UserPreferences, SavedRecipe } from './types';
-import { STORAGE_KEY_INGREDIENTS, STORAGE_KEY_APP_SETTINGS, STORAGE_KEY_SAVED_RECIPES, STORAGE_KEY_FOLDERS } from './constants';
-import { generateRecipes } from './services/geminiService';
+import TutorialWelcome from './components/TutorialWelcome';
+import TutorialGuide from './components/TutorialGuide';
+import { Ingredient, Recipe, Category, AppSettings, UserPreferences, SavedRecipe, RunMode, TutorialStatus, TutorialStep } from './types';
+import { STORAGE_KEY_INGREDIENTS, STORAGE_KEY_APP_SETTINGS, STORAGE_KEY_SAVED_RECIPES, STORAGE_KEY_FOLDERS, STORAGE_KEY_TUTORIAL_COMPLETED, STORAGE_KEY_RUN_MODE } from './constants';
+import { generateRecipes } from './services/aiService';
+import { getDemoRecipes } from './services/demoRecipeService';
+import { DEFAULT_DEMO_SCENARIO } from './data/demoScenarios';
 
 enum Tab {
   INVENTORY = 'inventory',
@@ -18,9 +22,9 @@ enum Tab {
 const DEFAULT_FOLDERS = ['默认清单', '健康餐', '快手菜', '周末大餐'];
 
 const DEFAULT_SETTINGS: AppSettings = {
-  apiUrl: 'https://generativelanguage.googleapis.com',
+  apiUrl: 'https://api.deepseek.com/v1',
   apiKey: '',
-  model: 'gemini-2.0-flash-exp'
+  model: 'deepseek-v4-flash'
 };
 
 const App: React.FC = () => {
@@ -32,6 +36,10 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [runMode, setRunMode] = useState<RunMode>('demo');
+  const [tutorialStatus, setTutorialStatus] = useState<TutorialStatus>('not_started');
+  const [tutorialStep, setTutorialStep] = useState<TutorialStep>('welcome');
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   // Load data from LocalStorage on mount
   useEffect(() => {
@@ -70,6 +78,18 @@ const App: React.FC = () => {
         console.error("Failed to parse folders", e);
       }
     }
+
+    const storedRunMode = localStorage.getItem(STORAGE_KEY_RUN_MODE);
+    if (storedRunMode === 'live' || storedRunMode === 'demo') {
+      setRunMode(storedRunMode);
+    }
+
+    if (localStorage.getItem(STORAGE_KEY_TUTORIAL_COMPLETED) === 'true') {
+      setTutorialStatus('completed');
+      setTutorialStep('results');
+    }
+
+    setHasLoaded(true);
   }, []);
 
   // Save to LocalStorage
@@ -103,18 +123,76 @@ const App: React.FC = () => {
     setIngredients(prev => prev.filter(i => i.id !== id));
   };
 
+  const handleStartTutorial = () => {
+    setRunMode('demo');
+    localStorage.setItem(STORAGE_KEY_RUN_MODE, 'demo');
+    setTutorialStatus('in_progress');
+    setTutorialStep('ingredients');
+    setActiveTab(Tab.INVENTORY);
+  };
+
+  const handleSkipTutorial = () => {
+    setTutorialStatus('completed');
+    setTutorialStep('results');
+    localStorage.setItem(STORAGE_KEY_TUTORIAL_COMPLETED, 'true');
+  };
+
+  const handleLoadDemoIngredients = () => {
+    setIngredients(DEFAULT_DEMO_SCENARIO.ingredients.map(ingredient => ({ ...ingredient })));
+    setRecipes([]);
+  };
+
+  const handleContinueTutorial = () => {
+    setTutorialStep('preferences');
+    setActiveTab(Tab.RECIPES);
+  };
+
+  const handleCompleteTutorial = () => {
+    setTutorialStatus('completed');
+    localStorage.setItem(STORAGE_KEY_TUTORIAL_COMPLETED, 'true');
+  };
+
+  const handleRestartTutorial = () => {
+    setRunMode('demo');
+    localStorage.setItem(STORAGE_KEY_RUN_MODE, 'demo');
+    localStorage.removeItem(STORAGE_KEY_TUTORIAL_COMPLETED);
+    setTutorialStatus('not_started');
+    setTutorialStep('welcome');
+    setRecipes([]);
+    setActiveTab(Tab.INVENTORY);
+  };
+
+  const handleEnableLiveMode = () => {
+    setRunMode('live');
+    localStorage.setItem(STORAGE_KEY_RUN_MODE, 'live');
+  };
+
+  const handleEnableDemoMode = () => {
+    setRunMode('demo');
+    localStorage.setItem(STORAGE_KEY_RUN_MODE, 'demo');
+  };
+
   const handleGenerateRecipes = async (prefs: UserPreferences) => {
-    if (!appSettings.apiKey) {
+    if (runMode === 'live' && !appSettings.apiKey) {
       setActiveTab(Tab.SETTINGS);
-      alert('请先在设置中配置 API Key');
+      setError('真实 AI 模式需要先配置 API Key；你也可以返回教学演示模式。');
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      const generated = await generateRecipes(ingredients, prefs, appSettings);
+      const generated = runMode === 'demo'
+        ? await getDemoRecipes(
+            ingredients,
+            prefs,
+            tutorialStatus === 'in_progress' ? DEFAULT_DEMO_SCENARIO.id : undefined
+          )
+        : await generateRecipes(ingredients, prefs, appSettings);
       setRecipes(generated);
+      if (tutorialStatus === 'in_progress') {
+        setTutorialStep('results');
+      }
     } catch (err: any) {
       setError(err.message || "生成食谱时遇到问题，请重试");
     } finally {
@@ -176,6 +254,10 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 pb-28 md:pb-10">
+      {hasLoaded && tutorialStatus === 'not_started' && (
+        <TutorialWelcome onStart={handleStartTutorial} onSkip={handleSkipTutorial} />
+      )}
+
       {/* iOS Style Blurry Sticky Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 pt-safe transition-all duration-300">
         <div className="max-w-3xl mx-auto px-5 py-3 flex items-center justify-between">
@@ -209,6 +291,10 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-5 pt-6 animate-fade-in">
+        {tutorialStatus === 'in_progress' && (
+          <TutorialGuide currentStep={tutorialStep} />
+        )}
+
         {error && (
           <div className="mb-6 bg-red-50/80 backdrop-blur-md border border-red-100 text-red-600 px-4 py-3 rounded-2xl flex items-center gap-3 shadow-sm">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 shrink-0">
@@ -222,7 +308,11 @@ const App: React.FC = () => {
           <Inventory 
             ingredients={ingredients} 
             onAdd={handleAddIngredient} 
-            onRemove={handleRemoveIngredient} 
+            onRemove={handleRemoveIngredient}
+            tutorialStatus={tutorialStatus}
+            tutorialStep={tutorialStep}
+            onLoadDemoIngredients={handleLoadDemoIngredients}
+            onContinueTutorial={handleContinueTutorial}
           />
         </div>
 
@@ -234,6 +324,10 @@ const App: React.FC = () => {
             onGenerate={handleGenerateRecipes}
             onSave={handleSaveRecipe}
             hasIngredients={ingredients.length > 0}
+            runMode={runMode}
+            tutorialStatus={tutorialStatus}
+            tutorialStep={tutorialStep}
+            onCompleteTutorial={handleCompleteTutorial}
           />
         </div>
 
@@ -252,6 +346,10 @@ const App: React.FC = () => {
           <Settings
             settings={appSettings}
             onSave={handleSaveSettings}
+            runMode={runMode}
+            onEnableLiveMode={handleEnableLiveMode}
+            onEnableDemoMode={handleEnableDemoMode}
+            onRestartTutorial={handleRestartTutorial}
           />
         </div>
       </main>

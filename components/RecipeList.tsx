@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Recipe, UserPreferences, Ingredient, Category } from '../types.ts';
+import { Recipe, UserPreferences, Ingredient, Category, RunMode, TutorialStatus, TutorialStep } from '../types.ts';
 import { CUISINE_STYLES, TASTE_PREFERENCES, CATEGORY_OPTIONS } from '../constants.ts';
 
 interface RecipeListProps {
@@ -9,9 +9,13 @@ interface RecipeListProps {
   onGenerate: (prefs: UserPreferences) => void;
   onSave: (recipe: Recipe) => void;
   hasIngredients: boolean;
+  runMode: RunMode;
+  tutorialStatus: TutorialStatus;
+  tutorialStep: TutorialStep;
+  onCompleteTutorial: () => void;
 }
 
-const RecipeList: React.FC<RecipeListProps> = ({ recipes, ingredients, loading, onGenerate, onSave, hasIngredients }) => {
+const RecipeList: React.FC<RecipeListProps> = ({ recipes, ingredients, loading, onGenerate, onSave, hasIngredients, runMode, tutorialStatus, tutorialStep, onCompleteTutorial }) => {
   const [cuisine, setCuisine] = useState(CUISINE_STYLES[0]);
   const [taste, setTaste] = useState(TASTE_PREFERENCES[0]);
   const [notes, setNotes] = useState('');
@@ -81,8 +85,16 @@ const RecipeList: React.FC<RecipeListProps> = ({ recipes, ingredients, loading, 
         <div className="relative p-6 z-10">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900 tracking-tight">定制今日菜单</h2>
-            <p className="text-gray-500 text-sm mt-1">告诉 AI 大厨你想吃什么</p>
+            <p className="text-gray-500 text-sm mt-1">
+              {runMode === 'demo' ? '设置偏好后查看预生成教学案例' : '告诉 AI 大厨你想吃什么'}
+            </p>
           </div>
+
+          {runMode === 'demo' && (
+            <div className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs leading-relaxed text-gray-600">
+              <strong className="text-gray-900">教学提示：</strong>点击下方按钮不会连接 AI，只会加载与当前食材匹配的预生成结果。
+            </div>
+          )}
           
           {/* Selectors */}
           <div className="grid grid-cols-2 gap-4 mb-5">
@@ -183,14 +195,14 @@ const RecipeList: React.FC<RecipeListProps> = ({ recipes, ingredients, loading, 
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>正在构思美味...</span>
+                <span>{runMode === 'demo' ? '正在加载教学示例...' : 'AI 正在生成食谱...'}</span>
               </>
             ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
                 </svg>
-                <span>生成个性化食谱</span>
+                <span>{runMode === 'demo' ? '生成个性化食谱（教学演示）' : '生成个性化食谱'}</span>
               </>
             )}
           </button>
@@ -282,6 +294,13 @@ const RecipeList: React.FC<RecipeListProps> = ({ recipes, ingredients, loading, 
         </div>
       )}
 
+      {runMode === 'demo' && recipes.length > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-xs leading-relaxed text-gray-600 shadow-ios">
+          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-gray-900" />
+          <p><strong className="text-gray-900">预生成教学案例：</strong>以下内容用于展示产品交互，不是本次操作实时调用 AI 生成的结果。</p>
+        </div>
+      )}
+
       {/* Recipe Grid (Compact Cards) */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {recipes.map((recipe, index) => {
@@ -342,6 +361,19 @@ const RecipeList: React.FC<RecipeListProps> = ({ recipes, ingredients, loading, 
           );
         })}
       </div>
+
+      {tutorialStatus === 'in_progress' && tutorialStep === 'results' && recipes.length > 0 && (
+        <section className="rounded-3xl bg-gray-900 p-6 text-white shadow-ios-lg">
+          <p className="text-[11px] font-bold tracking-wider text-gray-400">教学完成</p>
+          <h3 className="mt-2 text-2xl font-bold">你已经走完核心流程</h3>
+          <p className="mt-2 text-xs leading-relaxed text-gray-300">
+            刚才展示的是预生成案例，没有调用 AI。你可以继续查看详情、收藏食谱，或在设置中连接自己的 API。
+          </p>
+          <button onClick={onCompleteTutorial} className="mt-5 w-full rounded-2xl bg-white py-3.5 text-sm font-bold text-gray-900 transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900">
+            完成教学，继续自由体验
+          </button>
+        </section>
+      )}
 
       {/* Recipe Detail Modal */}
       {selectedRecipe && (

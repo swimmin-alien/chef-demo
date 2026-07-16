@@ -1,17 +1,20 @@
 
 import React, { useState } from 'react';
-import { AppSettings, ModelOption } from '../types';
-import { fetchAvailableModels } from '../services/geminiService';
+import { AppSettings, ModelOption, RunMode } from '../types';
+import { fetchAvailableModels } from '../services/aiService';
 
 interface SettingsProps {
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;
+  runMode: RunMode;
+  onEnableLiveMode: () => void;
+  onEnableDemoMode: () => void;
+  onRestartTutorial: () => void;
 }
 
-const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
+const Settings: React.FC<SettingsProps> = ({ settings, onSave, runMode, onEnableLiveMode, onEnableDemoMode, onRestartTutorial }) => {
   const [formState, setFormState] = useState<AppSettings>(settings);
   const [showKey, setShowKey] = useState(false);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -54,17 +57,40 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
       return;
     }
     onSave(formState);
-    setMessage({ type: 'success', text: '设置已保存' });
+    onEnableLiveMode();
+    setMessage({ type: 'success', text: '设置已保存，已启用真实 AI 生成' });
     setTimeout(() => setMessage(null), 3000);
   };
 
   return (
     <div className="space-y-6 pb-10">
+      <div className={`rounded-3xl border p-5 shadow-ios ${runMode === 'demo' ? 'border-gray-300 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-900'}`}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className={`text-[11px] font-bold tracking-wider ${runMode === 'demo' ? 'text-gray-400' : 'text-gray-400'}`}>当前运行模式</p>
+            <h2 className="mt-1 text-xl font-bold">{runMode === 'demo' ? '教学演示模式' : '真实 AI 模式'}</h2>
+            <p className={`mt-2 text-xs leading-relaxed ${runMode === 'demo' ? 'text-gray-300' : 'text-gray-500'}`}>
+              {runMode === 'demo'
+                ? '使用预生成案例，不连接 AI，也不会产生 API 费用。'
+                : '生成操作会使用下方保存的 API 配置。'}
+            </p>
+          </div>
+          <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${runMode === 'demo' ? 'bg-white' : 'bg-green-500'}`} />
+        </div>
+        {runMode === 'live' && (
+          <button onClick={onEnableDemoMode} className="mt-4 w-full rounded-xl bg-gray-100 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-200">
+            返回教学演示模式
+          </button>
+        )}
+        <button onClick={onRestartTutorial} className={`mt-3 w-full rounded-xl py-2.5 text-xs font-bold transition ${runMode === 'demo' ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+          重新播放首次教学
+        </button>
+      </div>
       
       <div className="bg-white rounded-3xl shadow-ios border border-gray-100/50 overflow-hidden">
         <div className="p-6 border-b border-gray-50">
-           <h2 className="text-lg font-bold text-gray-900">自定义 API 连接</h2>
-           <p className="text-xs text-gray-400 mt-1">支持 Google Gemini 原生 API 及任何 OpenAI 兼容接口</p>
+           <h2 className="text-lg font-bold text-gray-900">启用真实 AI 生成</h2>
+           <p className="text-xs text-gray-400 mt-1">支持OpenAI 兼容接口</p>
         </div>
 
         <div className="p-6 space-y-6">
@@ -78,11 +104,11 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
               type="text"
               value={formState.apiUrl}
               onChange={(e) => handleChange('apiUrl', e.target.value)}
-              placeholder="https://api.openai.com/v1"
+              placeholder="https://api.deepseek.com/v1"
               className="w-full bg-gray-50 text-gray-900 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-gray-900 transition-all text-sm font-mono"
             />
             <p className="text-[10px] text-gray-400 ml-1">
-              例如: <code>https://generativelanguage.googleapis.com</code> (Google) 或 <code>https://api.deepseek.com/v1</code> (OpenAI 兼容)
+              请在 API 地址结尾填写 <code>/v1</code>，例如：<code>https://api.deepseek.com/v1</code>
             </p>
           </div>
 
@@ -111,6 +137,9 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                 )}
               </button>
             </div>
+            <p className="text-[10px] text-gray-400 ml-1">
+              API Key 只填写密钥本身；<code>/v1</code> 应写在上方 API 地址末尾。
+            </p>
           </div>
 
           {/* Actions: Test & Load */}
@@ -157,7 +186,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
                   type="text"
                   value={formState.model}
                   onChange={(e) => handleChange('model', e.target.value)}
-                  placeholder="例如：gemini-2.0-flash 或 gpt-4o-mini"
+                  placeholder="例如：deepseek-v4-flash 或 gpt-4o-mini"
                   className="w-full bg-gray-50 text-gray-900 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-gray-900 transition-all text-sm"
                 />
               )}
@@ -182,7 +211,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onSave }) => {
               onClick={handleSave}
               className="w-full bg-gray-900 text-white font-bold py-4 rounded-2xl shadow-lg shadow-gray-200 hover:scale-[1.01] active:scale-95 transition-all text-sm"
             >
-              保存配置
+              保存并启用真实生成
             </button>
           </div>
 

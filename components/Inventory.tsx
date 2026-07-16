@@ -1,14 +1,26 @@
 import React, { useState } from 'react';
-import { Ingredient, Category } from '../types';
+import { Ingredient, Category, TutorialStatus, TutorialStep } from '../types';
 import { CATEGORY_OPTIONS } from '../constants';
 
 interface InventoryProps {
   ingredients: Ingredient[];
   onAdd: (name: string, category: Category) => void;
   onRemove: (id: string) => void;
+  tutorialStatus: TutorialStatus;
+  tutorialStep: TutorialStep;
+  onLoadDemoIngredients: () => void;
+  onContinueTutorial: () => void;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ ingredients, onAdd, onRemove }) => {
+const Inventory: React.FC<InventoryProps> = ({
+  ingredients,
+  onAdd,
+  onRemove,
+  tutorialStatus,
+  tutorialStep,
+  onLoadDemoIngredients,
+  onContinueTutorial,
+}) => {
   const [newName, setNewName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>(Category.REFRIGERATED);
   const [filterCategory, setFilterCategory] = useState<Category | 'ALL'>('ALL');
@@ -33,6 +45,32 @@ const Inventory: React.FC<InventoryProps> = ({ ingredients, onAdd, onRemove }) =
 
   return (
     <div className="space-y-6">
+      {tutorialStatus === 'in_progress' && tutorialStep === 'ingredients' && (
+        <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-ios-lg">
+          <div className="border-b border-gray-100 bg-gray-50 px-5 py-4">
+            <p className="text-[11px] font-bold tracking-wider text-gray-400">第 1 步 · 示例食材</p>
+            <h2 className="mt-1 text-xl font-bold text-gray-900">先装入一组下班快手餐</h2>
+            <p className="mt-1 text-xs leading-relaxed text-gray-500">这组固定食材用于教学，后续展示的食谱也是预先准备好的案例。</p>
+          </div>
+          <div className="p-5">
+            <div className="mb-4 flex flex-wrap gap-2">
+              {['鸡蛋', '番茄', '面条', '小葱'].map(name => (
+                <span key={name} className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">{name}</span>
+              ))}
+            </div>
+            {ingredients.some(item => item.id.startsWith('demo-')) ? (
+              <button onClick={onContinueTutorial} className="w-full rounded-2xl bg-gray-900 py-3.5 text-sm font-bold text-white transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">
+                下一步：设置口味
+              </button>
+            ) : (
+              <button onClick={onLoadDemoIngredients} className="w-full rounded-2xl bg-gray-900 py-3.5 text-sm font-bold text-white transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">
+                装入示例食材
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Add Item Card */}
       <div className="bg-white p-5 rounded-3xl shadow-ios border border-gray-100/50">
         <form onSubmit={handleAdd} className="flex flex-col gap-4">

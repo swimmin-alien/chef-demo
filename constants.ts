@@ -49,4 +49,6 @@ export const STORAGE_KEY_INGREDIENTS = 'smart_fridge_ingredients';
 export const STORAGE_KEY_APP_SETTINGS = 'smart_fridge_app_settings'; // New key
 export const STORAGE_KEY_SAVED_RECIPES = 'smart_fridge_saved_recipes';
 export const STORAGE_KEY_FOLDERS = 'smart_fridge_folders';
+export const STORAGE_KEY_TUTORIAL_COMPLETED = 'smart_fridge_tutorial_completed';
+export const STORAGE_KEY_RUN_MODE = 'smart_fridge_run_mode';
 // Deprecated: STORAGE_KEY_SETTINGS (was used for model only)
